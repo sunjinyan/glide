@@ -179,35 +179,19 @@ func (g *Channel) Subscribe(id subscription.SubscriberID, extra interface{}) err
 		g.mu.Unlock()
 		logger.I("subscriber %s subscribe channel %s", id, g.id)
 	}
+	_ = g.pushNotify(
+		nil, subscription.NotifyTypeOnline, struct {
+			Uid string `json:"uid"`
+		}{
+			string(id),
+		})
 
-	onlineNotify := PublishMessage{
-		Message: messages.NewMessage(0, messages.ActionGroupNotify, subscription.NotifyMessage{
-			From: "system",
-			Type: subscription.NotifyTypeOnline,
-			Body: struct {
-				Uid string `json:"uid"`
-			}{
-				string(id),
-			},
-		}),
+	body := struct {
+		Members []string `json:"members"`
+	}{
+		g.GetSubscribers(),
 	}
-	_ = g.enqueueNotify(&onlineNotify)
-
-	statusNotify := PublishMessage{
-		To: []subscription.SubscriberID{id},
-		Message: messages.NewMessage(0, messages.ActionGroupNotify, subscription.NotifyMessage{
-			From: "system",
-			Type: subscription.NotifyOnlineMembers,
-			Body: struct {
-				Members []string `json:"members"`
-			}{
-				g.GetSubscribers(),
-			},
-		}),
-	}
-	_ = g.enqueueNotify(&statusNotify)
-
-	return nil
+	return g.pushNotify([]subscription.SubscriberID{id}, subscription.NotifyOnlineMembers, body)
 }
 
 func (g *Channel) Unsubscribe(id subscription.SubscriberID) error {
@@ -220,20 +204,11 @@ func (g *Channel) Unsubscribe(id subscription.SubscriberID) error {
 		return errors.New(subscription.ErrNotSubscribed)
 	}
 	delete(g.subscribers, id)
-
-	onlineNotify := PublishMessage{
-		Message: messages.NewMessage(0, messages.ActionGroupNotify, subscription.NotifyMessage{
-			From: "system",
-			Type: subscription.NotifyTypeOffline,
-			Body: struct {
-				Uid string `json:"uid"`
-			}{
-				string(id),
-			},
-		}),
-	}
-	_ = g.enqueueNotify(&onlineNotify)
-	return nil
+	return g.pushNotify(nil, subscription.NotifyTypeOffline, struct {
+		Uid string `json:"uid"`
+	}{
+		string(id),
+	})
 }
 
 func (g *Channel) Publish(msg subscription.Message) error {
@@ -293,6 +268,19 @@ func (g *Channel) Close() error {
 		logger.D("chan %s closed, %d messages dropped", g.id, g.queued)
 	}
 	return nil
+}
+
+func (g *Channel) pushNotify(to []subscription.SubscriberID, typ int, content interface{}) error {
+	notify := PublishMessage{
+		Message: messages.NewMessage(0, messages.ActionGroupNotify, subscription.NotifyMessage{
+			From: "system",
+			Type: typ,
+			Body: content,
+		}),
+		To: to,
+	}
+	notify.Message.To = string(g.id)
+	return g.enqueueNotify(&notify)
 }
 
 func (g *Channel) enqueueNotify(msg *PublishMessage) error {

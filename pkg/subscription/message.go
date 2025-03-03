@@ -11,12 +11,12 @@ type Message interface {
 }
 
 const (
-	NotifyTypeOffline = 1
-	NotifyTypeOnline  = 2
-	NotifyTypeJoin    = 3
-	NotifyTypeLeave   = 4
+	NotifyTypeOffline = 2001
+	NotifyTypeOnline  = 2002
+	NotifyTypeJoin    = 2003
+	NotifyTypeLeave   = 2004
 
-	NotifyOnlineMembers = 5
+	NotifyOnlineMembers = 2005
 )
 
 type NotifyMessage struct {
