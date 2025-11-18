@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"errors"
+
 	"github.com/glide-im/glide/pkg/gate"
 	"github.com/glide-im/glide/pkg/messages"
 	"github.com/glide-im/glide/pkg/messaging"
@@ -9,8 +10,8 @@ import (
 )
 
 type Options struct {
-	Messaging    messaging.Interface
-	Gate         gate.DefaultGateway
+	Messaging    messaging.Messaging
+	Gate         gate.Gateway
 	Subscription subscription.Interface
 }
 
@@ -25,7 +26,7 @@ func Bootstrap(opts *Options) error {
 	if ok {
 		return bootGatewayServer(opts)
 	}
-	_, ok = opts.Messaging.(messaging.Server)
+	_, ok = opts.Messaging.(messaging.Messaging)
 	if ok {
 		return bootMessagingServer(opts)
 	}
@@ -51,7 +52,7 @@ func setupDependence(opts *Options) error {
 
 	sb, ok := opts.Subscription.(subscription.Subscribe)
 	if ok {
-		sb.SetGateInterface(opts.Gate)
+		sb.SetGateInterface(opts.Gate.(gate.DefaultGateway))
 	}
 	return nil
 }
@@ -61,12 +62,12 @@ func bootSubscriptionServer(opts *Options) error {
 	if !ok {
 		return errors.New("subscription server not implemented")
 	}
-	server.SetGateInterface(opts.Gate)
+	server.SetGateInterface(opts.Gate.(gate.DefaultGateway))
 	return server.Run()
 }
 
 func bootMessagingServer(opts *Options) error {
-	server, ok := opts.Messaging.(messaging.Server)
+	server, ok := opts.Messaging.(messaging.Messaging)
 	if !ok {
 		return errors.New("messaging does not implement Messaging.impl")
 	}
@@ -76,7 +77,7 @@ func bootMessagingServer(opts *Options) error {
 		server.SetGate(manager)
 	}
 	server.SetSubscription(opts.Subscription)
-	return server.Run()
+	return nil
 }
 
 func bootGatewayServer(opts *Options) error {
